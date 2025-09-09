@@ -8,6 +8,7 @@ import asyncio
 import sys
 import os
 import signal
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from main_bot import CryptoSnipingBot
 
 def check_environment():

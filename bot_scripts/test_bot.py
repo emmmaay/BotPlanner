@@ -5,6 +5,8 @@ Test script for crypto sniping bot components
 
 import asyncio
 import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 from config import Config
 from telegram_notifier import TelegramNotifier
 from trading_engine import TradingEngine
