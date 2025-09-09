@@ -18,6 +18,10 @@ author = "agent"
 task = "workflow.run"
 args = "Crypto Bot Test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Security Test"
+
 [[workflows.workflow]]
 name = "Crypto Bot Test"
 author = "agent"
@@ -25,6 +29,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python3 bot_scripts/test_bot.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Security Test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 bot_scripts/test_security.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
