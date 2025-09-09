@@ -3,6 +3,7 @@ import logging
 from typing import Dict, Any, Optional, Tuple
 from web3 import Web3
 from web3.contract import Contract
+from web3.middleware import geth_poa_middleware
 from eth_account import Account
 from decimal import Decimal
 import time
@@ -16,6 +17,8 @@ class TradingEngine:
         self.config = Config()
         self.logger = logging.getLogger(__name__)
         self.web3 = Web3(Web3.HTTPProvider(self.config.BSC_RPC_URL))
+        # Add POA middleware for BSC compatibility
+        self.web3.middleware_onion.inject(geth_poa_middleware, layer=0)
         
         # Account setup
         self.account = Account.from_key(self.config.PRIVATE_KEY)

@@ -4,6 +4,7 @@ import time
 from typing import Dict, Any, Optional, Set, Callable
 from web3 import Web3
 from web3.contract import Contract
+from web3.middleware import geth_poa_middleware
 import json
 import requests
 from config import Config
@@ -19,6 +20,8 @@ class BlockchainMonitor:
         self.config = Config()
         self.logger = logging.getLogger(__name__)
         self.web3 = Web3(Web3.HTTPProvider(self.config.BSC_RPC_URL))
+        # Add POA middleware for BSC compatibility
+        self.web3.middleware_onion.inject(geth_poa_middleware, layer=0)
         self.on_new_token_callback = on_new_token_callback
         
         # Tracking sets
