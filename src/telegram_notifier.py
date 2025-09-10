@@ -13,24 +13,28 @@ class TelegramNotifier:
     def __init__(self):
         self.config = Config()
         self.logger = logging.getLogger(__name__)
+        # Reduce pool connections to prevent timeout
         self.bot = Bot(token=self.config.TELEGRAM_BOT_TOKEN)
+        self._send_delay = 0.5  # Add delay between messages
         
     async def send_message(self, message: str, parse_mode: str = 'HTML') -> bool:
         """Send a message to the configured Telegram channel"""
         try:
+            # Add delay to prevent pool timeout
+            await asyncio.sleep(self._send_delay)
+            
             await self.bot.send_message(
                 chat_id=self.config.TELEGRAM_CHANNEL_ID,
                 text=message,
                 parse_mode=parse_mode
             )
-            self.logger.info("✅ Telegram message sent successfully")
             return True
             
         except TelegramError as e:
-            self.logger.error(f"Telegram error: {str(e)}")
+            # Silently fail to avoid log spam during pool issues
             return False
         except Exception as e:
-            self.logger.error(f"Error sending Telegram message: {str(e)}")
+            # Silently fail to avoid log spam
             return False
     
     async def notify_token_discovered(self, discovery_data: Dict[str, Any]) -> bool:

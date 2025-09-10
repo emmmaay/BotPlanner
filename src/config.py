@@ -19,9 +19,9 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID', '')
     
-    # Trading Configuration
-    DEFAULT_BUY_AMOUNT = Decimal(os.getenv('DEFAULT_BUY_AMOUNT', '0.0001'))
-    GAS_RESERVE = Decimal(os.getenv('GAS_RESERVE', '0.0001'))
+    # Trading Configuration  
+    DEFAULT_BUY_AMOUNT = Decimal(os.getenv('DEFAULT_BUY_AMOUNT', '0.00005'))  # Smaller buy amount
+    GAS_RESERVE = Decimal(os.getenv('GAS_RESERVE', '0.0003'))  # Higher gas reserve
     MAX_TRACKED_TOKENS = int(os.getenv('MAX_TRACKED_TOKENS', '1000'))
     PROFIT_TAKE_5X = int(os.getenv('PROFIT_TAKE_5X', '25'))
     PROFIT_TAKE_10X = int(os.getenv('PROFIT_TAKE_10X', '25'))
