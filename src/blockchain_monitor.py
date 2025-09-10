@@ -7,6 +7,7 @@ from web3.contract import Contract
 from web3.middleware import geth_poa_middleware
 import json
 import requests
+import aiohttp
 from config import Config
 from security_analyzer import SecurityAnalyzer
 import websockets
@@ -248,15 +249,28 @@ class BlockchainMonitor:
         block: Dict[str, Any],
         discovery_type: str
     ):
-        """Handle discovery of a new token"""
+        """Handle discovery of a new token with age filtering"""
         try:
             # Avoid duplicate processing
             if token_address in self.monitored_tokens:
                 return
                 
+            self.logger.info(f"🔍 Checking token age for: {token_address}")
+            
+            # Check token age using BSC API
+            token_age_minutes = await self._get_token_age_minutes(token_address)
+            if token_age_minutes is None:
+                self.logger.warning(f"Unable to determine token age for {token_address}")
+                return
+                
+            # Only process fresh tokens (max 3 minutes old)
+            if token_age_minutes > self.config.MAX_TOKEN_AGE_MINUTES:
+                self.logger.info(f"🕐 Token too old ({token_age_minutes:.1f} min), skipping: {token_address}")
+                return
+                
             self.monitored_tokens.add(token_address)
             
-            self.logger.info(f"🔍 New token discovered via {discovery_type}: {token_address}")
+            self.logger.info(f"🚀 FRESH TOKEN FOUND ({token_age_minutes:.1f} min old) via {discovery_type}: {token_address}")
             
             # Get basic token information
             token_info = await self._get_token_info(token_address)
@@ -264,7 +278,7 @@ class BlockchainMonitor:
                 self.logger.warning(f"Unable to get token info for {token_address}")
                 return
             
-            # Prepare discovery data
+            # Prepare discovery data with age info
             discovery_data = {
                 'token_address': token_address,
                 'pair_address': pair_address,
@@ -273,6 +287,8 @@ class BlockchainMonitor:
                 'block_number': block.number,
                 'timestamp': block.timestamp,
                 'token_info': token_info,
+                'token_age_minutes': token_age_minutes,
+                'is_fresh': True,
                 'gas_used': tx.gas,
                 'gas_price': tx.gasPrice
             }
@@ -323,6 +339,47 @@ class BlockchainMonitor:
             
         except Exception as e:
             self.logger.error(f"Error getting token info for {token_address}: {str(e)}")
+            return None
+    
+    async def _get_token_age_minutes(self, token_address: str) -> Optional[float]:
+        """Get token age in minutes using BSC API"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Get token creation transaction from BSC API
+                url = "https://api.bscscan.com/api"
+                params = {
+                    'module': 'account',
+                    'action': 'txlist',
+                    'address': token_address,
+                    'startblock': 0,
+                    'endblock': 99999999,
+                    'page': 1,
+                    'offset': 1,
+                    'sort': 'asc',
+                    'apikey': self.config.BSC_SCAN_API_KEY
+                }
+                
+                async with session.get(url, params=params) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get('status') == '1' and data.get('result'):
+                            first_tx = data['result'][0]
+                            creation_timestamp = int(first_tx['timeStamp'])
+                            current_timestamp = int(time.time())
+                            age_seconds = current_timestamp - creation_timestamp
+                            age_minutes = age_seconds / 60.0
+                            
+                            self.logger.info(f"Token {token_address} age: {age_minutes:.1f} minutes")
+                            return age_minutes
+                        else:
+                            self.logger.warning(f"No transaction data for token: {token_address}")
+                            return None
+                    else:
+                        self.logger.error(f"BSC API error: {response.status}")
+                        return None
+                        
+        except Exception as e:
+            self.logger.error(f"Error getting token age: {str(e)}")
             return None
     
     async def _get_pair_token_info(self, pair_address: str) -> Optional[Dict[str, str]]:

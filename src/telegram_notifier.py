@@ -34,21 +34,16 @@ class TelegramNotifier:
             return False
     
     async def notify_token_discovered(self, discovery_data: Dict[str, Any]) -> bool:
-        """Notify about new token discovery"""
+        """Notify about new fresh token discovery - CONCISE for speed"""
         try:
             token_info = discovery_data.get('token_info', {})
+            token_age = discovery_data.get('token_age_minutes', 0)
             
+            # Super concise for fresh tokens - speed matters!
             message = f"""
-🔍 <b>NEW TOKEN DISCOVERED!</b>
-
-💎 <b>Token:</b> {token_info.get('name', 'Unknown')} ({token_info.get('symbol', 'UNKNOWN')})
-📊 <b>Address:</b> <code>{discovery_data['token_address']}</code>
-🔗 <b>Pair:</b> <code>{discovery_data['pair_address']}</code>
-⚡ <b>Discovery:</b> {discovery_data['discovery_type'].replace('_', ' ').title()}
-⛽ <b>Block:</b> {discovery_data['block_number']}
-🕐 <b>Time:</b> {time.strftime('%H:%M:%S', time.localtime(discovery_data['timestamp']))}
-
-🔄 Running security analysis...
+🚀 <b>FRESH TOKEN</b> ({token_age:.1f}min)
+💎 {token_info.get('symbol', 'UNK')} | <code>{discovery_data['token_address'][:6]}...{discovery_data['token_address'][-4:]}</code>
+🔄 Analyzing...
             """
             
             return await self.send_message(message)
@@ -58,37 +53,26 @@ class TelegramNotifier:
             return False
     
     async def notify_security_analysis(self, token_address: str, analysis_result: Dict[str, Any]) -> bool:
-        """Notify about security analysis results"""
+        """Notify about security analysis results - CONCISE"""
         try:
             is_safe = analysis_result.get('is_safe', False)
             score = analysis_result.get('security_score', 0)
+            is_fresh = analysis_result.get('is_fresh_token', False)
             
             if is_safe:
-                status_emoji = "✅"
-                status_text = "PASSED SECURITY"
+                if is_fresh:
+                    message = f"✅ <b>SAFE</b> {score}% | 🚀 <b>BUYING NOW!</b>"
+                else:
+                    message = f"✅ <b>SAFE</b> {score}% | 🚀 <b>BUYING!</b>"
             else:
-                status_emoji = "❌"
-                status_text = "FAILED SECURITY"
-            
-            message = f"""
-{status_emoji} <b>SECURITY ANALYSIS COMPLETE</b>
-
-📊 <b>Token:</b> <code>{token_address}</code>
-🛡️ <b>Security Score:</b> {score}%
-📋 <b>Status:</b> {status_text}
-
-            """
-            
-            if is_safe:
-                message += "🚀 <b>Token meets security criteria! Preparing to purchase...</b>"
-            else:
-                # Add risk details
+                message = f"❌ <b>UNSAFE</b> {score}% | ⛔ <b>SKIPPING</b>"
+                
+                # Add main risk reason
                 detailed_analysis = analysis_result.get('detailed_analysis', {})
                 risks = detailed_analysis.get('risks', [])
                 if risks:
-                    message += "⚠️ <b>Security Issues:</b>\n"
-                    for risk in risks[:3]:  # Show top 3 risks
-                        message += f"• {risk}\n"
+                    main_risk = risks[0].split(':')[0] if ':' in risks[0] else risks[0]
+                    message += f"\n⚠️ {main_risk}"
             
             return await self.send_message(message)
             
@@ -102,45 +86,16 @@ class TelegramNotifier:
         token_info: Dict[str, Any], 
         buy_result: Dict[str, Any]
     ) -> bool:
-        """Notify about successful token purchase with sweet celebration"""
+        """Notify about successful token purchase - CONCISE"""
         try:
             amount_bnb = buy_result.get('amount_bnb', 0)
             tx_hash = buy_result.get('transaction_hash', '')
-            actual_tokens = buy_result.get('actual_tokens', 0)
-            
-            # Sweet celebration messages
-            celebration_messages = [
-                "🎉 MOONSHOT ACQUIRED! 🚀",
-                "💎 DIAMOND HANDS ACTIVATED! 💎", 
-                "🔥 ABSOLUTE GEM SECURED! 🔥",
-                "⚡ LIGHTNING FAST SNIPE! ⚡",
-                "🎯 BULLSEYE TARGET HIT! 🎯",
-                "🏆 CHAMPION MOVE EXECUTED! 🏆"
-            ]
-            
-            import random
-            celebration = random.choice(celebration_messages)
             
             message = f"""
-{celebration}
-
-🎊 <b>SUCCESSFUL PURCHASE!</b> 🎊
-
-💰 <b>Token:</b> {token_info.get('name', 'Unknown')} ({token_info.get('symbol', 'UNKNOWN')})
-📊 <b>Address:</b> <code>{token_address}</code>
-💸 <b>Amount Invested:</b> {amount_bnb} BNB
-🪙 <b>Tokens Received:</b> {actual_tokens:,}
-📝 <b>TX Hash:</b> <code>{tx_hash}</code>
-
-🚀 <b>TO THE MOON!</b> 🌙
-💎 <b>Hold tight, this one's going places!</b>
-
-⚡ Profit targets:
-• 25% at 5x (500% gain)
-• 25% at 10x (1000% gain)  
-• 50% riding to the moon! 🌙
-
-🤖 Bot is now monitoring for profit opportunities...
+🎯 <b>BOUGHT!</b> 💎 {token_info.get('symbol', 'UNK')}
+💰 {amount_bnb} BNB | 🚀 <b>MOON MISSION STARTED!</b>
+📝 <code>{tx_hash[:10]}...{tx_hash[-6:]}</code>
+⚡ Monitoring for 5x/10x profits...
             """
             
             return await self.send_message(message)
@@ -188,19 +143,18 @@ class TelegramNotifier:
             return False
     
     async def notify_error(self, error_type: str, error_message: str, token_address: str = None) -> bool:
-        """Notify about errors"""
+        """Notify about errors - CONCISE"""
         try:
-            message = f"""
-⚠️ <b>BOT ERROR ALERT</b> ⚠️
-
-🔴 <b>Error Type:</b> {error_type}
-📝 <b>Message:</b> {error_message}
-            """
+            # Only notify critical errors to reduce spam
+            critical_errors = ['critical error', 'purchase failed', 'wallet', 'connection']
+            
+            if not any(critical in error_type.lower() or critical in error_message.lower() for critical in critical_errors):
+                return True  # Skip non-critical errors
+                
+            message = f"⚠️ <b>{error_type}:</b> {error_message[:100]}..."
             
             if token_address:
-                message += f"📊 <b>Token:</b> <code>{token_address}</code>\n"
-            
-            message += f"🕐 <b>Time:</b> {time.strftime('%H:%M:%S', time.localtime())}"
+                message += f"\n📊 <code>{token_address[:6]}...{token_address[-4:]}</code>"
             
             return await self.send_message(message)
             

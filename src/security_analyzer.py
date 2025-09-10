@@ -27,51 +27,62 @@ class SecurityAnalyzer:
     async def _make_goplus_request(self, endpoint: str, params: dict) -> Dict[str, Any]:
         """Make authenticated request to Go Plus API with retry logic"""
         try:
+            # Updated headers for Go Plus API v2
             headers = {
                 'Authorization': f'Bearer {self.config.GOPLUS_APP_KEY}',
                 'X-API-SECRET': self.config.GOPLUS_APP_SECRET,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'User-Agent': 'CryptoSnipingBot/1.0'
             }
             
             url = f"{self.config.GOPLUS_BASE_URL}{endpoint}"
             
-            async with self.session.get(url, headers=headers, params=params, timeout=10) as response:
+            self.logger.debug(f"Making Go Plus API request to: {url}")
+            
+            async with self.session.get(url, headers=headers, params=params, timeout=15) as response:
                 if response.status == 200:
                     data = await response.json()
+                    self.logger.debug(f"Go Plus API response received successfully")
                     return data
                 else:
-                    self.logger.error(f"Go Plus API error: {response.status} - {await response.text()}")
+                    error_text = await response.text()
+                    self.logger.error(f"Go Plus API error: {response.status} - {error_text}")
                     return {}
                     
         except Exception as e:
             self.logger.error(f"Error making Go Plus request: {str(e)}")
             raise
     
-    async def analyze_token_security(self, token_address: str, chain_id: str = "56") -> Dict[str, Any]:
-        """Perform comprehensive security analysis on a token"""
+    async def analyze_token_security(self, token_address: str, chain_id: str = "56", is_fresh_token: bool = False) -> Dict[str, Any]:
+        """Perform comprehensive security analysis on a token with fresh token considerations"""
         try:
-            self.logger.info(f"Starting security analysis for token: {token_address}")
+            self.logger.info(f"Starting security analysis for {'FRESH' if is_fresh_token else 'STANDARD'} token: {token_address}")
             
             # Get token security from Go Plus
             security_data = await self._get_goplus_security(token_address, chain_id)
             
-            # Perform additional custom checks
-            custom_checks = await self._perform_custom_checks(token_address, security_data)
+            # Perform additional custom checks with fresh token context
+            custom_checks = await self._perform_custom_checks(token_address, security_data, is_fresh_token)
             
-            # Calculate overall security score
-            security_score = self._calculate_security_score(security_data, custom_checks)
+            # Calculate overall security score with appropriate threshold
+            security_score = self._calculate_security_score(security_data, custom_checks, is_fresh_token)
+            
+            # Use different thresholds for fresh vs regular tokens
+            safety_threshold = self.config.FRESH_TOKEN_SECURITY_THRESHOLD if is_fresh_token else 80
             
             analysis_result = {
                 'token_address': token_address,
                 'security_score': security_score,
-                'is_safe': security_score >= 80,  # 80% threshold for safety
+                'is_safe': security_score >= safety_threshold,
+                'is_fresh_token': is_fresh_token,
+                'safety_threshold': safety_threshold,
                 'goplus_data': security_data,
                 'custom_checks': custom_checks,
                 'timestamp': int(time.time()),
-                'detailed_analysis': self._generate_detailed_analysis(security_data, custom_checks)
+                'detailed_analysis': self._generate_detailed_analysis(security_data, custom_checks, is_fresh_token)
             }
             
-            self.logger.info(f"Security analysis completed. Score: {security_score}% - {'SAFE' if analysis_result['is_safe'] else 'UNSAFE'}")
+            self.logger.info(f"Security analysis completed. Score: {security_score}% (Threshold: {safety_threshold}%) - {'SAFE' if analysis_result['is_safe'] else 'UNSAFE'}")
             return analysis_result
             
         except Exception as e:
@@ -105,30 +116,30 @@ class SecurityAnalyzer:
             self.logger.error(f"Error getting Go Plus security data: {str(e)}")
             return {}
     
-    async def _perform_custom_checks(self, token_address: str, goplus_data: Dict) -> Dict[str, Any]:
-        """Perform additional custom security checks"""
+    async def _perform_custom_checks(self, token_address: str, goplus_data: Dict, is_fresh_token: bool = False) -> Dict[str, Any]:
+        """Perform additional custom security checks with fresh token considerations"""
         checks = {}
         
         try:
-            # Check 1: Honeypot detection
+            # Check 1: Honeypot detection (critical for all tokens)
             checks['honeypot_check'] = await self._check_honeypot(goplus_data)
             
-            # Check 2: Liquidity analysis
-            checks['liquidity_check'] = await self._check_liquidity(goplus_data)
+            # Check 2: Liquidity analysis (adjusted for fresh tokens)
+            checks['liquidity_check'] = await self._check_liquidity(goplus_data, is_fresh_token)
             
-            # Check 3: Holder distribution analysis
-            checks['holder_check'] = await self._check_holder_distribution(token_address, goplus_data)
+            # Check 3: Holder distribution analysis (relaxed for fresh tokens)
+            checks['holder_check'] = await self._check_holder_distribution(token_address, goplus_data, is_fresh_token)
             
-            # Check 4: Contract verification
+            # Check 4: Contract verification (less critical for fresh tokens)
             checks['contract_verification'] = await self._check_contract_verification(goplus_data)
             
             # Check 5: Trading tax analysis
             checks['tax_analysis'] = await self._analyze_trading_taxes(goplus_data)
             
-            # Check 6: Mint function check
+            # Check 6: Mint function check (critical)
             checks['mint_check'] = await self._check_mint_function(goplus_data)
             
-            # Check 7: Ownership check
+            # Check 7: Ownership check (critical)
             checks['ownership_check'] = await self._check_ownership(goplus_data)
             
             # Check 8: Proxy contract check
@@ -137,7 +148,7 @@ class SecurityAnalyzer:
             # Check 9: External call check
             checks['external_call_check'] = await self._check_external_calls(goplus_data)
             
-            # Check 10: Hidden owner check
+            # Check 10: Hidden owner check (critical)
             checks['hidden_owner_check'] = await self._check_hidden_owner(goplus_data)
             
             return checks
@@ -161,8 +172,8 @@ class SecurityAnalyzer:
         except:
             return {'is_safe': False, 'score': 0, 'error': 'Unable to check honeypot'}
     
-    async def _check_liquidity(self, goplus_data: Dict) -> Dict[str, Any]:
-        """Analyze liquidity safety"""
+    async def _check_liquidity(self, goplus_data: Dict, is_fresh_token: bool = False) -> Dict[str, Any]:
+        """Analyze liquidity safety with fresh token considerations"""
         try:
             total_supply = float(goplus_data.get('total_supply', '0'))
             lp_total_supply = float(goplus_data.get('lp_total_supply', '0'))
@@ -172,42 +183,74 @@ class SecurityAnalyzer:
             
             liquidity_ratio = (lp_total_supply / total_supply) * 100 if total_supply > 0 else 0
             
-            # Good liquidity should be at least 50% of total supply
-            is_safe = liquidity_ratio >= 50
-            score = min(100, liquidity_ratio * 2)  # Scale to 100
+            # Adjust liquidity requirements for fresh tokens
+            if is_fresh_token:
+                # For fresh tokens, we're more lenient - even 10% liquidity is acceptable
+                min_liquidity_ratio = 10
+                is_safe = liquidity_ratio >= min_liquidity_ratio
+                score = min(100, liquidity_ratio * 5)  # More generous scoring
+            else:
+                # Regular tokens need higher liquidity
+                min_liquidity_ratio = 50
+                is_safe = liquidity_ratio >= min_liquidity_ratio
+                score = min(100, liquidity_ratio * 2)
             
             return {
                 'is_safe': is_safe,
                 'liquidity_ratio': liquidity_ratio,
+                'min_required': min_liquidity_ratio,
                 'score': score,
                 'lp_total_supply': lp_total_supply,
-                'total_supply': total_supply
+                'total_supply': total_supply,
+                'is_fresh_token': is_fresh_token
             }
         except:
             return {'is_safe': False, 'score': 0, 'error': 'Unable to analyze liquidity'}
     
-    async def _check_holder_distribution(self, token_address: str, goplus_data: Dict) -> Dict[str, Any]:
-        """Analyze holder distribution for concentration risk"""
+    async def _check_holder_distribution(self, token_address: str, goplus_data: Dict, is_fresh_token: bool = False) -> Dict[str, Any]:
+        """Analyze holder distribution with fresh token considerations"""
         try:
-            # Get top 10 holders data from Go Plus
             holder_count = int(goplus_data.get('holder_count', '0'))
             
-            # For new tokens at launch, holder count might be low
-            # Implement smart logic here
-            if holder_count <= 2:  # Likely at launch
-                # Check if trading has started
-                is_trading = goplus_data.get('is_trading', '0') == '1'
-                if not is_trading:
-                    # Token hasn't started trading yet, this might be acceptable
+            if is_fresh_token:
+                # For fresh tokens (max 3 min old), very low holder count is expected and GOOD
+                if holder_count <= 5:
                     return {
                         'is_safe': True,
-                        'score': 70,  # Moderate score for launch phase
+                        'score': 90,  # High score for fresh tokens with few holders
+                        'reason': f'Fresh token with {holder_count} holders - excellent for sniping',
+                        'holder_count': holder_count,
+                        'is_fresh': True
+                    }
+                elif holder_count <= 20:
+                    return {
+                        'is_safe': True,
+                        'score': 75,
+                        'reason': f'Fresh token with {holder_count} holders - good for sniping',
+                        'holder_count': holder_count,
+                        'is_fresh': True
+                    }
+                else:
+                    return {
+                        'is_safe': True,
+                        'score': 60,
+                        'reason': f'Fresh token with {holder_count} holders - acceptable',
+                        'holder_count': holder_count,
+                        'is_fresh': True
+                    }
+            
+            # Regular token logic (not fresh)
+            if holder_count <= 2:
+                is_trading = goplus_data.get('is_trading', '0') == '1'
+                if not is_trading:
+                    return {
+                        'is_safe': True,
+                        'score': 70,
                         'reason': 'Token at launch phase',
                         'holder_count': holder_count,
                         'at_launch': True
                     }
             
-            # For tokens with trading activity
             if holder_count < self.config.MIN_HOLDERS_COUNT:
                 return {
                     'is_safe': False,
@@ -216,9 +259,7 @@ class SecurityAnalyzer:
                     'holder_count': holder_count
                 }
             
-            # Check for whale concentration
-            # This is a simplified check - in practice you'd want more detailed holder analysis
-            score = min(100, (holder_count / 100) * 100)  # Scale based on holder count
+            score = min(100, (holder_count / 100) * 100)
             is_safe = holder_count >= self.config.MIN_HOLDERS_COUNT
             
             return {
@@ -355,32 +396,44 @@ class SecurityAnalyzer:
         except:
             return {'is_safe': True, 'score': 100, 'error': 'Unable to check hidden owner'}
     
-    def _calculate_security_score(self, goplus_data: Dict, custom_checks: Dict) -> int:
-        """Calculate overall security score based on all checks"""
+    def _calculate_security_score(self, goplus_data: Dict, custom_checks: Dict, is_fresh_token: bool = False) -> int:
+        """Calculate overall security score with fresh token considerations"""
         try:
             scores = []
             weights = []
             
-            # Critical checks (higher weight)
-            critical_checks = ['honeypot_check', 'hidden_owner_check', 'mint_check']
+            # Critical checks (always highest weight)
+            critical_checks = ['honeypot_check', 'hidden_owner_check', 'mint_check', 'ownership_check']
             for check_name in critical_checks:
                 if check_name in custom_checks and 'score' in custom_checks[check_name]:
                     scores.append(custom_checks[check_name]['score'])
-                    weights.append(3)  # Higher weight for critical checks
+                    weights.append(4 if is_fresh_token else 3)  # Even higher weight for fresh tokens
             
-            # Important checks (medium weight)
-            important_checks = ['liquidity_check', 'ownership_check', 'tax_analysis', 'contract_verification']
+            # Important checks (adjusted weight for fresh tokens)
+            important_checks = ['liquidity_check', 'tax_analysis']
             for check_name in important_checks:
                 if check_name in custom_checks and 'score' in custom_checks[check_name]:
                     scores.append(custom_checks[check_name]['score'])
-                    weights.append(2)
+                    weights.append(3 if is_fresh_token else 2)
             
-            # Standard checks (normal weight)
-            standard_checks = ['holder_check', 'proxy_check', 'external_call_check']
-            for check_name in standard_checks:
-                if check_name in custom_checks and 'score' in custom_checks[check_name]:
-                    scores.append(custom_checks[check_name]['score'])
+            # For fresh tokens, holder count is actually a positive indicator
+            if 'holder_check' in custom_checks and 'score' in custom_checks['holder_check']:
+                holder_score = custom_checks['holder_check']['score']
+                if is_fresh_token:
+                    # For fresh tokens, boost score if holder count is low (good for sniping)
+                    scores.append(holder_score)
+                    weights.append(2)  # Important for fresh tokens
+                else:
+                    scores.append(holder_score)
                     weights.append(1)
+            
+            # Less critical for fresh tokens
+            if not is_fresh_token:
+                standard_checks = ['contract_verification', 'proxy_check', 'external_call_check']
+                for check_name in standard_checks:
+                    if check_name in custom_checks and 'score' in custom_checks[check_name]:
+                        scores.append(custom_checks[check_name]['score'])
+                        weights.append(1)
             
             if not scores:
                 return 0
@@ -391,14 +444,18 @@ class SecurityAnalyzer:
             
             overall_score = int(weighted_sum / total_weight) if total_weight > 0 else 0
             
-            return max(0, min(100, overall_score))  # Ensure score is between 0-100
+            # Bonus for fresh tokens that pass critical checks
+            if is_fresh_token and overall_score > 50:
+                overall_score = min(100, overall_score + 10)  # 10% bonus for fresh tokens
+            
+            return max(0, min(100, overall_score))
             
         except Exception as e:
             self.logger.error(f"Error calculating security score: {str(e)}")
             return 0
     
-    def _generate_detailed_analysis(self, goplus_data: Dict, custom_checks: Dict) -> Dict[str, Any]:
-        """Generate detailed analysis report"""
+    def _generate_detailed_analysis(self, goplus_data: Dict, custom_checks: Dict, is_fresh_token: bool = False) -> Dict[str, Any]:
+        """Generate detailed analysis report with fresh token considerations"""
         try:
             analysis = {
                 'summary': {},
@@ -407,22 +464,38 @@ class SecurityAnalyzer:
                 'recommendations': []
             }
             
+            # Add fresh token context
+            if is_fresh_token:
+                analysis['summary']['token_type'] = 'Fresh Token (< 3 min old)'
+                analysis['strengths'].append('Fresh token - excellent for sniping opportunity')
+            
             # Analyze each check and generate insights
             for check_name, check_data in custom_checks.items():
                 if isinstance(check_data, dict):
                     if check_data.get('is_safe', False):
-                        analysis['strengths'].append(f"{check_name.replace('_', ' ').title()}: Passed")
+                        reason = check_data.get('reason', 'Passed security check')
+                        analysis['strengths'].append(f"{check_name.replace('_', ' ').title()}: {reason}")
                     else:
                         risk_reason = check_data.get('reason', check_data.get('error', 'Failed security check'))
                         analysis['risks'].append(f"{check_name.replace('_', ' ').title()}: {risk_reason}")
             
-            # Generate recommendations based on risks
-            if len(analysis['risks']) == 0:
-                analysis['recommendations'].append("Token appears safe for investment")
-            elif len(analysis['risks']) <= 2:
-                analysis['recommendations'].append("Low risk token - proceed with caution")
+            # Generate recommendations based on risks and token type
+            if is_fresh_token:
+                if len(analysis['risks']) == 0:
+                    analysis['recommendations'].append("🚀 EXCELLENT fresh token - BUY NOW!")
+                elif len(analysis['risks']) <= 1:
+                    analysis['recommendations'].append("✅ Good fresh token - proceed with buy")
+                elif len(analysis['risks']) <= 2:
+                    analysis['recommendations'].append("⚠️ Moderate risk fresh token - careful consideration")
+                else:
+                    analysis['recommendations'].append("❌ High risk - avoid this token")
             else:
-                analysis['recommendations'].append("High risk token - avoid investment")
+                if len(analysis['risks']) == 0:
+                    analysis['recommendations'].append("Token appears safe for investment")
+                elif len(analysis['risks']) <= 2:
+                    analysis['recommendations'].append("Low risk token - proceed with caution")
+                else:
+                    analysis['recommendations'].append("High risk token - avoid investment")
             
             return analysis
             

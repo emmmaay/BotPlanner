@@ -35,11 +35,16 @@ class Config:
     # BSC Chain ID
     BSC_CHAIN_ID = 56
     
-    # Security thresholds
-    MIN_LIQUIDITY_USD = 1000
-    MAX_HOLDER_PERCENTAGE = 30
-    MIN_HOLDERS_COUNT = 5
+    # Security thresholds for fresh tokens (sniping mode)
+    MIN_LIQUIDITY_USD = 500  # Lower for fresh tokens
+    MAX_HOLDER_PERCENTAGE = 50  # Higher tolerance for new tokens
+    MIN_HOLDERS_COUNT = 1  # Allow very new tokens
     HONEYPOT_CHECK = True
+    
+    # Fresh token sniping configuration
+    MAX_TOKEN_AGE_MINUTES = 3  # Only snipe tokens max 3 minutes old
+    FRESH_TOKEN_SECURITY_THRESHOLD = 60  # Lower threshold for fresh tokens
+    MIN_LIQUIDITY_FRESH_USD = 100  # Minimum liquidity for fresh tokens
     
     # Retry configuration
     MAX_RETRIES = 3

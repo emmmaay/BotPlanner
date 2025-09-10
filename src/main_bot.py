@@ -170,7 +170,7 @@ class CryptoSnipingBot:
             # Notify about discovery
             await self.telegram_notifier.notify_token_discovered(discovery_data)
             
-            # Perform security analysis
+            # Perform security analysis for fresh token
             await self._analyze_and_potentially_buy(discovery_data)
             
         except Exception as e:
@@ -192,9 +192,13 @@ class CryptoSnipingBot:
             
             self.logger.get_logger().info(f"🔍 Starting security analysis for {token_address}")
             
-            # Perform comprehensive security analysis
+            # Perform comprehensive security analysis for fresh token
+            is_fresh_token = discovery_data.get('is_fresh', False)
             async with self.security_analyzer:
-                analysis_result = await self.security_analyzer.analyze_token_security(token_address)
+                analysis_result = await self.security_analyzer.analyze_token_security(
+                    token_address, 
+                    is_fresh_token=is_fresh_token
+                )
             
             is_safe = analysis_result.get('is_safe', False)
             score = analysis_result.get('security_score', 0)
