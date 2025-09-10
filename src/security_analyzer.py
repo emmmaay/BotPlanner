@@ -212,6 +212,17 @@ class SecurityAnalyzer:
         try:
             holder_count = int(goplus_data.get('holder_count', '0'))
             
+            # Check top holder concentration (most important metric)
+            top_10_holder_percent = float(goplus_data.get('top_10_holder_percent', '0'))
+            if top_10_holder_percent > 80:  # If top 10 holders own >80%, that's risky
+                return {
+                    'is_safe': False,
+                    'score': 20,
+                    'reason': f'High concentration risk: Top 10 holders own {top_10_holder_percent}%',
+                    'holder_count': holder_count,
+                    'concentration': top_10_holder_percent
+                }
+            
             if is_fresh_token:
                 # For fresh tokens (max 3 min old), very low holder count is expected and GOOD
                 if holder_count <= 5:
@@ -220,6 +231,7 @@ class SecurityAnalyzer:
                         'score': 90,  # High score for fresh tokens with few holders
                         'reason': f'Fresh token with {holder_count} holders - excellent for sniping',
                         'holder_count': holder_count,
+                        'concentration': top_10_holder_percent,
                         'is_fresh': True
                     }
                 elif holder_count <= 20:
