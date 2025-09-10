@@ -22,6 +22,10 @@ args = "Crypto Bot Test"
 task = "workflow.run"
 args = "Security Test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Crypto Sniping Bot"
+
 [[workflows.workflow]]
 name = "Crypto Bot Test"
 author = "agent"
@@ -43,3 +47,18 @@ args = "python3 bot_scripts/test_security.py"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "Crypto Sniping Bot"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python bot_scripts/run_bot.py"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[deployment]
+deploymentTarget = "vm"
+run = ["python", "bot_scripts/run_bot.py"]
