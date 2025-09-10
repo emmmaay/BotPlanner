@@ -8,6 +8,17 @@ This is an automated cryptocurrency trading bot designed to monitor the Binance 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+### Fresh Token Sniping Optimization (September 10, 2025)
+- **Token Age Filtering**: Added BSC API integration to filter tokens by age (max 3 minutes)
+- **Fresh Token Security**: Adjusted security thresholds for new tokens (60% vs 80% for regular tokens)
+- **Holder Count Logic**: Updated to favor low holder counts for fresh tokens (1-5 holders = excellent for sniping)
+- **API Integration**: Fixed GoPlus API calls with proper headers and error handling
+- **Telegram Optimization**: Simplified notifications to reduce spam and increase speed
+- **Configuration Updates**: Added fresh token specific settings (MAX_TOKEN_AGE_MINUTES, FRESH_TOKEN_SECURITY_THRESHOLD)
+- **Liquidity Thresholds**: Lowered minimum liquidity requirements for fresh tokens (10% vs 50%)
+
 ## System Architecture
 
 ### Core Architecture Pattern
@@ -19,18 +30,23 @@ The bot follows a modular, event-driven architecture with asynchronous processin
 - Central coordinator that initializes and manages all bot components
 - Handles graceful shutdown and error recovery
 - Implements signal handlers for clean termination
+- **NEW**: Passes fresh token context to security analyzer
 
 **Blockchain Monitor (blockchain_monitor.py)**
 - Monitors BSC blockchain for new token launches and liquidity additions
 - Tracks PancakeSwap factory events for new pair creation
 - Uses Web3 to interact with blockchain RPC endpoints
 - Maintains sets of monitored tokens and processed transactions to avoid duplicates
+- **NEW**: BSC API integration for token age verification (max 3 minutes)
+- **NEW**: Filters out old tokens to focus on fresh launches only
 
 **Security Analyzer (security_analyzer.py)**
 - Integrates with Go Plus Labs API for comprehensive token security analysis
 - Performs honeypot detection, holder analysis, and liquidity verification
 - Implements retry logic and rate limiting for API calls
-- Uses configurable security thresholds for automated decision making
+- **NEW**: Dual security thresholds (60% for fresh tokens, 80% for regular)
+- **NEW**: Fresh token optimized scoring (low holder count = good for sniping)
+- **NEW**: Improved GoPlus API integration with better error handling
 
 **Trading Engine (trading_engine.py)**
 - Handles all PancakeSwap trading operations using Web3
