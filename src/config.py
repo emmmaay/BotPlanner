@@ -19,9 +19,24 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
     TELEGRAM_CHANNEL_ID = os.getenv('TELEGRAM_CHANNEL_ID', '')
     
-    # Trading Configuration  
-    DEFAULT_BUY_AMOUNT = Decimal(os.getenv('DEFAULT_BUY_AMOUNT', '0.00005'))  # Smaller buy amount
-    GAS_RESERVE = Decimal(os.getenv('GAS_RESERVE', '0.0003'))  # Higher gas reserve
+    # ====================================================================
+    # 🎯 YOUR TRADING SETTINGS - CHANGE THESE ANYTIME YOU WANT!
+    # ====================================================================
+    # Your current balance: 0.0004 BNB
+    # Gas cost per trade: ~0.0025 BNB 
+    # 
+    # RECOMMENDED FOR YOUR BALANCE:
+    # - Buy amount: 0.00001 BNB ($0.06) per token  
+    # - Gas reserve: Keep 0.0035 BNB for gas
+    # - This gives you: 0.0004 - 0.0035 = Not enough! Need more BNB!
+    #
+    # OPTION 1: Add more BNB to wallet (recommended: at least 0.01 BNB)
+    # OPTION 2: Try tiny amounts (risk: may not be profitable)
+    # ====================================================================
+    
+    DEFAULT_BUY_AMOUNT = Decimal(os.getenv('DEFAULT_BUY_AMOUNT', '0.000008'))  # Super tiny for testing
+    GAS_RESERVE = Decimal(os.getenv('GAS_RESERVE', '0.000350'))  # Gas reserve
+    MIN_WALLET_BALANCE = Decimal(os.getenv('MIN_WALLET_BALANCE', '0.000350'))  # Never go below this
     MAX_TRACKED_TOKENS = int(os.getenv('MAX_TRACKED_TOKENS', '1000'))
     PROFIT_TAKE_5X = int(os.getenv('PROFIT_TAKE_5X', '25'))
     PROFIT_TAKE_10X = int(os.getenv('PROFIT_TAKE_10X', '25'))
