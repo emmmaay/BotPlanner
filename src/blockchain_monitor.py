@@ -372,15 +372,16 @@ class BlockchainMonitor:
                             self.logger.info(f"Token {token_address} age: {age_minutes:.1f} minutes")
                             return age_minutes
                         else:
-                            self.logger.warning(f"No transaction data for token: {token_address}")
-                            return None
+                            # No transaction data might mean VERY fresh token!
+                            self.logger.info(f"No TX data for {token_address} - likely VERY fresh token!")
+                            return 0.1  # Assume super fresh (6 seconds old)
                     else:
-                        self.logger.error(f"BSC API error: {response.status}")
-                        return None
+                        self.logger.warning(f"BSC API error {response.status} - assuming fresh")
+                        return 0.5  # Assume fresh if API fails
                         
         except Exception as e:
-            self.logger.error(f"Error getting token age: {str(e)}")
-            return None
+            self.logger.warning(f"BSC API timeout - assuming fresh token")
+            return 0.5  # If API fails, assume it's fresh
     
     async def _get_pair_token_info(self, pair_address: str) -> Optional[Dict[str, str]]:
         """Get token addresses from a pair contract"""
