@@ -29,6 +29,7 @@ class BlockchainMonitor:
         self.monitored_tokens: Set[str] = set()
         self.processed_transactions: Set[str] = set()
         self.recent_blocks = deque(maxlen=100)  # Keep track of recent blocks
+        self.recent_pairs: Dict[str, float] = {}  # Track recently created pairs: pair_address -> timestamp
         
         # PancakeSwap contract addresses and ABIs
         self.pancakeswap_factory_address = self.config.PANCAKESWAP_FACTORY
@@ -182,6 +183,9 @@ class BlockchainMonitor:
                             new_token_address = token1
                         
                         if new_token_address:
+                            # Track this pair as recently created
+                            self.recent_pairs[pair_address] = time.time()
+                            
                             self.logger.info(f"New token pair created: {new_token_address}")
                             await self._handle_new_token_discovery(
                                 new_token_address, 
@@ -253,6 +257,11 @@ class BlockchainMonitor:
         try:
             # Avoid duplicate processing
             if token_address in self.monitored_tokens:
+                return
+            
+            # 🚨 CRITICAL FIX: Skip known old tokens (USDT, BUSD, etc.)
+            if token_address.lower() in [addr.lower() for addr in self.config.DENYLIST_TOKENS]:
+                self.logger.info(f"🚫 SKIPPED KNOWN OLD TOKEN: {token_address}")
                 return
                 
             self.logger.info(f"🔍 Checking token age for: {token_address}")
@@ -372,9 +381,9 @@ class BlockchainMonitor:
                             self.logger.info(f"Token {token_address} age: {age_minutes:.1f} minutes")
                             return age_minutes
                         else:
-                            # No transaction data might mean VERY fresh token!
-                            self.logger.info(f"No TX data for {token_address} - likely VERY fresh token!")
-                            return 0.1  # Assume super fresh (6 seconds old)
+                            # No transaction data - DON'T assume fresh, skip it!
+                            self.logger.warning(f"No TX data for {token_address} - age unknown, SKIPPING")
+                            return None  # Return None to skip
                     else:
                         self.logger.warning(f"BSC API error {response.status} - assuming fresh")
                         return 0.5  # Assume fresh if API fails
