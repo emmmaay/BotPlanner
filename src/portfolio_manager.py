@@ -4,7 +4,7 @@ import json
 import time
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from config import Config
 from trading_engine import TradingEngine
 
@@ -23,11 +23,7 @@ class TokenPosition:
     profit_loss_percent: Optional[float] = None
     profit_loss_bnb: Optional[Decimal] = None
     is_monitoring: bool = True
-    partial_sales: List[Dict[str, Any]] = None
-    
-    def __post_init__(self):
-        if self.partial_sales is None:
-            self.partial_sales = []
+    partial_sales: List[Dict[str, Any]] = field(default_factory=list)
 
 class PortfolioManager:
     """Manage token portfolio and automated profit-taking"""
